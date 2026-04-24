@@ -1,1 +1,1100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>달의 크기 변화 · Edutoon Sample</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    background:
+      radial-gradient(ellipse at 15% 40%, rgba(32, 48, 96, 0.5) 0%, transparent 50%),
+      radial-gradient(ellipse at 85% 80%, rgba(64, 32, 96, 0.4) 0%, transparent 50%),
+      linear-gradient(180deg, #030612 0%, #010308 100%);
+    color: #e8eaf6;
+    font-family: 'IBM Plex Sans KR', -apple-system, sans-serif;
+    position: relative;
+    user-select: none;
+  }
+
+  #canvas { display: block; cursor: grab; touch-action: none; }
+  #canvas.grabbing { cursor: grabbing; }
+
+  .header {
+    position: absolute;
+    top: 28px; left: 36px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .kicker {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    color: #6b75a8;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .kicker::before {
+    content: '';
+    display: inline-block;
+    width: 24px; height: 1px;
+    background: #6b75a8;
+    vertical-align: middle;
+    margin-right: 10px;
+    margin-bottom: 3px;
+  }
+
+  .title {
+    font-size: 26px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: #f0f2ff;
+    line-height: 1.2;
+  }
+
+  .title em {
+    font-style: normal;
+    font-weight: 600;
+    color: #ffcf7a;
+  }
+
+  .day-counter {
+    margin-top: 26px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    max-width: 360px;
+  }
+
+  .day-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 52px;
+    font-weight: 700;
+    color: #ffcf7a;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 24px rgba(255, 207, 122, 0.3);
+  }
+
+  .day-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .day-label-en {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: #6b75a8;
+    text-transform: uppercase;
+  }
+
+  .day-label-ko {
+    font-size: 13px;
+    color: #a0a9d4;
+    font-weight: 300;
+  }
+
+  .day-label-ko strong {
+    color: #fff;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 32px; left: 36px;
+    font-size: 13px;
+    color: #8b94c8;
+    font-weight: 300;
+    padding: 11px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 100px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hint-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ffcf7a;
+    box-shadow: 0 0 8px #ffcf7a;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  .hint strong { color: #fff; font-weight: 500; }
+
+  .panel {
+    position: absolute;
+    top: 50%; right: 36px;
+    transform: translateY(-50%);
+    width: 300px;
+    background: rgba(8, 12, 32, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 24px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .panel-label {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.24em;
+    color: #7a84bd;
+    text-transform: uppercase;
+  }
+
+  .visibility-badge {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.08em;
+    transition: all 0.3s ease;
+  }
+
+  .visibility-badge.visible {
+    background: rgba(180, 230, 140, 0.12);
+    color: #c9e8a0;
+    border: 1px solid rgba(180, 230, 140, 0.3);
+  }
+
+  .visibility-badge.hidden {
+    background: rgba(255, 255, 255, 0.04);
+    color: #6b75a8;
+    border: 1px solid rgba(107, 117, 168, 0.2);
+  }
+
+  .observer-view {
+    aspect-ratio: 1;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(80, 100, 180, 0.15) 0%, transparent 60%),
+      radial-gradient(circle at 50% 55%, #1a1f3a 0%, #050813 100%);
+    border-radius: 14px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .observer-view::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='10' cy='15' r='0.5' fill='white' opacity='0.4'/%3E%3Ccircle cx='40' cy='8' r='0.7' fill='white' opacity='0.3'/%3E%3Ccircle cx='22' cy='45' r='0.4' fill='white' opacity='0.5'/%3E%3Ccircle cx='55' cy='30' r='0.5' fill='white' opacity='0.3'/%3E%3Ccircle cx='5' cy='50' r='0.3' fill='white' opacity='0.4'/%3E%3Ccircle cx='48' cy='52' r='0.6' fill='white' opacity='0.25'/%3E%3C/svg%3E");
+    opacity: 0.8;
+  }
+
+  .horizon-line {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 18%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 120, 0.25), transparent);
+    z-index: 1;
+  }
+
+  .horizon-label {
+    position: absolute;
+    left: 12px;
+    bottom: calc(18% + 4px);
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    color: rgba(255, 215, 120, 0.4);
+    letter-spacing: 0.1em;
+    z-index: 1;
+  }
+
+  .observer-moon {
+    position: absolute;
+    left: 50%;
+    bottom: 18%;
+    transform: translate(-50%, 50%);
+    transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease,
+                bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2;
+    filter: drop-shadow(0 0 18px rgba(245, 228, 180, 0.35));
+    overflow: visible;
+  }
+
+  .observer-moon.below-horizon {
+    opacity: 0.15;
+    bottom: 8%;
+    filter: blur(2px) drop-shadow(0 0 6px rgba(245, 228, 180, 0.1));
+  }
+
+  .observer-moon svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  .phase-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .phase-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #1a1d2e;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 0.5px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .phase-icon svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  .phase-en-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: #7a84bd;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+    display: block;
+    text-transform: uppercase;
+  }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .data-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .data-row:first-of-type { padding-top: 4px; }
+
+  .data-key {
+    font-size: 12px;
+    color: #8b94c8;
+    font-weight: 300;
+  }
+
+  .data-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .data-unit {
+    font-size: 10px;
+    color: #7a84bd;
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .size-indicator {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  }
+
+  .size-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-top: 8px;
+    position: relative;
+  }
+
+  .size-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6b75a8 0%, #ffcf7a 100%);
+    border-radius: 100px;
+    transition: width 0.2s ease;
+  }
+
+  .size-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: #6b75a8;
+    letter-spacing: 0.08em;
+  }
+</style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="header">
+    <div class="kicker">Edutoon Sample · Interactive Node</div>
+    <div class="title">
+      지구를 돌려<br>
+      달의 <em>크기 변화</em>를 관찰하세요
+    </div>
+    <div class="day-counter">
+      <div class="day-num" id="dayNum">0</div>
+      <div class="day-label">
+        <span class="day-label-en">Days Elapsed</span>
+        <span class="day-label-ko"><strong id="dayLabelKo">0</strong>일 경과 · 달 1회 공전 = 27.3일</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">
+    <span class="hint-dot"></span>
+    <span><strong>지구를 드래그</strong>해서 돌려보세요 · 오른쪽 <strong>태양</strong>이 달을 비추며 초승달 → 보름달 → 그믐달로 변합니다</span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-label">Observer's View</div>
+      <div class="visibility-badge visible" id="visBadge">VISIBLE</div>
+    </div>
+
+    <div class="observer-view">
+      <div class="horizon-line"></div>
+      <div class="horizon-label">HORIZON</div>
+      <div class="observer-moon" id="observerMoon">
+        <svg id="moonSvg" viewBox="-55 -55 110 110" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="moonLitGrad" cx="0.35" cy="0.30" r="0.75">
+              <stop offset="0%" stop-color="#fdf6e3"/>
+              <stop offset="45%" stop-color="#e8dcba"/>
+              <stop offset="85%" stop-color="#b3a485"/>
+              <stop offset="100%" stop-color="#7a7060"/>
+            </radialGradient>
+            <radialGradient id="moonDarkGrad" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0%" stop-color="#12152a"/>
+              <stop offset="100%" stop-color="#1a1d33"/>
+            </radialGradient>
+          </defs>
+          <circle cx="0" cy="0" r="50" fill="url(#moonDarkGrad)" stroke="rgba(120,130,170,0.2)" stroke-width="0.5"/>
+          <path id="moonLitPath" d="" fill="url(#moonLitGrad)"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="data-row">
+      <span class="data-key">달의 위상</span>
+      <span class="phase-name">
+        <span class="phase-icon"><svg viewBox="-55 -55 110 110"><circle cx="0" cy="0" r="50" fill="#0a0d1a"/><path id="phaseIconPath" d="" fill="#f0e4c2"/></svg></span>
+        <span>
+          <span class="data-val" id="phaseNameVal">삭</span>
+          <span class="phase-en-label" id="phaseEnVal">New Moon</span>
+        </span>
+      </span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">관찰자 – 달 거리</span>
+      <span><span class="data-val" id="distVal">0</span><span class="data-unit">천 km</span></span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">시직경</span>
+      <span><span class="data-val" id="angleVal">0</span><span class="data-unit">°</span></span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">궤도 위치</span>
+      <span class="data-val" id="phaseVal">—</span>
+    </div>
+
+    <div class="size-indicator">
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8b94c8;">
+        <span>상대적 크기</span>
+        <span id="relSizeVal" style="font-family: 'Space Mono', monospace; color: #ffcf7a; font-weight: 700;">0%</span>
+      </div>
+      <div class="size-bar"><div class="size-bar-fill" id="sizeBar" style="width: 50%"></div></div>
+      <div class="size-bar-labels">
+        <span>小 · 원지점</span>
+        <span>大 · 근지점</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let W, H;
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // --- State ---
+    let earthRotation = -0.5;
+    let earthAngularVel = 0;
+    let isDragging = false;
+    let lastDragAngle = 0;
+    let moonOrbit = 0;
+    let days = 0;
+
+    // --- Time constants ---
+    // Moon's sidereal orbital period: 27.3 Earth days
+    // Earth rotates once per day → Earth angular speed = Moon angular speed × 27.3
+    const MOON_ANG_SPEED = 0.09;                    // rad/s (slowed from 0.25)
+    const DAYS_PER_ORBIT = 27.3;
+    const EARTH_ANG_SPEED = MOON_ANG_SPEED * DAYS_PER_ORBIT;
+
+    // --- Layout ratios ---
+    const CFG = {
+      earthXRatio: 0.27,
+      earthRRatio: 0.10,
+      orbitARatio: 0.26,
+      orbitBRatio: 0.21,
+      moonRRatio: 0.022
+    };
+
+    // --- Stars ---
+    const stars = [];
+    for (let i = 0; i < 220; i++) {
+      stars.push({
+        x: Math.random(),
+        y: Math.random(),
+        size: Math.random() * 1.4 + 0.2,
+        twinkle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.8 + 0.3,
+        hue: Math.random() < 0.15 ? 210 : (Math.random() < 0.3 ? 40 : 0)
+      });
+    }
+
+    // --- Geometry helpers ---
+    function getEarth() {
+      const m = Math.min(W, H);
+      return { x: W * CFG.earthXRatio, y: H * 0.54, r: m * CFG.earthRRatio };
+    }
+
+    function getOrbitParams() {
+      const m = Math.min(W, H);
+      const a = m * CFG.orbitARatio;
+      const b = m * CFG.orbitBRatio;
+      const c = Math.sqrt(a * a - b * b);
+      return { a, b, c, e: c / a };
+    }
+
+    function getMoon() {
+      const e = getEarth();
+      const { a, c, e: ecc } = getOrbitParams();
+      const r = a * (1 - ecc * ecc) / (1 + ecc * Math.cos(moonOrbit));
+      const mx = e.x + r * Math.cos(moonOrbit);
+      const my = e.y + r * Math.sin(moonOrbit);
+      const m = Math.min(W, H);
+      return { x: mx, y: my, r: m * CFG.moonRRatio, dist: r };
+    }
+
+    function getObserver() {
+      const e = getEarth();
+      return {
+        x: e.x + e.r * Math.cos(earthRotation),
+        y: e.y + e.r * Math.sin(earthRotation),
+        nx: Math.cos(earthRotation),
+        ny: Math.sin(earthRotation)
+      };
+    }
+
+    // --- Interaction ---
+    function onPointerDown(px, py) {
+      const e = getEarth();
+      const dx = px - e.x, dy = py - e.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < e.r * 1.4) {
+        isDragging = true;
+        lastDragAngle = Math.atan2(dy, dx);
+        earthAngularVel = 0;
+        canvas.classList.add('grabbing');
+      }
+    }
+
+    function onPointerMove(px, py) {
+      if (!isDragging) return;
+      const e = getEarth();
+      const angle = Math.atan2(py - e.y, px - e.x);
+      let delta = angle - lastDragAngle;
+      if (delta > Math.PI) delta -= 2 * Math.PI;
+      if (delta < -Math.PI) delta += 2 * Math.PI;
+      earthRotation += delta;
+      earthAngularVel = delta;
+      lastDragAngle = angle;
+    }
+
+    function onPointerUp() {
+      isDragging = false;
+      canvas.classList.remove('grabbing');
+    }
+
+    canvas.addEventListener('mousedown', e => onPointerDown(e.clientX, e.clientY));
+    canvas.addEventListener('mousemove', e => onPointerMove(e.clientX, e.clientY));
+    canvas.addEventListener('mouseup', onPointerUp);
+    canvas.addEventListener('mouseleave', onPointerUp);
+
+    canvas.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      onPointerDown(t.clientX, t.clientY);
+      if (isDragging) e.preventDefault();
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      onPointerMove(t.clientX, t.clientY);
+      if (isDragging) e.preventDefault();
+    }, { passive: false });
+    canvas.addEventListener('touchend', onPointerUp);
+    canvas.addEventListener('touchcancel', onPointerUp);
+
+    // --- Rendering ---
+    function drawStars(t) {
+      for (const s of stars) {
+        const alpha = 0.35 + 0.55 * (0.5 + 0.5 * Math.sin(s.twinkle + t * s.speed));
+        if (s.hue === 210) ctx.fillStyle = `rgba(160, 190, 255, ${alpha})`;
+        else if (s.hue === 40) ctx.fillStyle = `rgba(255, 220, 160, ${alpha})`;
+        else ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x * W, s.y * H, s.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Sun is far to the right of the scene (practical stand-in for "infinity").
+    // Drawn as a small indicator with rays pointing into the scene so the user
+    // can see which direction illuminates the Moon.
+    function drawSun() {
+      const x = W - 72;
+      const y = Math.min(130, H * 0.18);
+      const r = 22;
+
+      // Rays pointing left (toward the scene)
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 215, 130, 0.25)';
+      ctx.lineWidth = 1;
+      const rayCount = 7;
+      for (let i = 0; i < rayCount; i++) {
+        const ang = Math.PI + (i - (rayCount - 1) / 2) * 0.12;
+        const rx1 = x + Math.cos(ang) * (r + 6);
+        const ry1 = y + Math.sin(ang) * (r + 6);
+        const rx2 = x + Math.cos(ang) * (r + 40);
+        const ry2 = y + Math.sin(ang) * (r + 40);
+        ctx.beginPath();
+        ctx.moveTo(rx1, ry1);
+        ctx.lineTo(rx2, ry2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Outer glow
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+      glow.addColorStop(0, 'rgba(255, 220, 130, 0.55)');
+      glow.addColorStop(0.35, 'rgba(255, 200, 90, 0.18)');
+      glow.addColorStop(1, 'rgba(255, 200, 90, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sun body
+      const body = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+      body.addColorStop(0, '#fffbe8');
+      body.addColorStop(0.4, '#ffe08a');
+      body.addColorStop(1, '#ff9d3a');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      ctx.font = '500 11px "IBM Plex Sans KR"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(255, 220, 130, 0.9)';
+      ctx.fillText('태양', x, y + r + 10);
+      ctx.font = '400 9px "Space Mono", monospace';
+      ctx.fillStyle = 'rgba(255, 200, 120, 0.45)';
+      ctx.fillText('SUN (far away)', x, y + r + 26);
+    }
+
+    // --- Moon phase helpers ---
+    // Sun is assumed to be at +x infinity. Illuminated fraction as seen from Earth:
+    //   f = (1 - cos θ) / 2   where θ = moonOrbit angle
+    // θ = 0 → new, θ = π → full. Waxing on [0, π], waning on (π, 2π).
+    function getMoonPhase() {
+      const theta = ((moonOrbit % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const frac = (1 - Math.cos(theta)) / 2;
+      const waxing = theta < Math.PI;
+
+      let ko, en;
+      if (frac < 0.02) { ko = '삭'; en = 'New Moon'; }
+      else if (frac < 0.46) { ko = waxing ? '초승달' : '그믐달'; en = waxing ? 'Waxing Crescent' : 'Waning Crescent'; }
+      else if (frac < 0.54) { ko = waxing ? '상현달' : '하현달'; en = waxing ? 'First Quarter' : 'Last Quarter'; }
+      else if (frac < 0.98) { ko = waxing ? '차오르는 달' : '이울어지는 달'; en = waxing ? 'Waxing Gibbous' : 'Waning Gibbous'; }
+      else { ko = '보름달'; en = 'Full Moon'; }
+
+      return { frac, waxing, ko, en, theta };
+    }
+
+    // Build SVG path for the lit area of the Moon disk (radius r, centered at 0,0).
+    function moonPhasePath(r, frac, waxing) {
+      if (frac <= 0.005) return '';
+      if (frac >= 0.995) {
+        return `M ${-r} 0 A ${r} ${r} 0 1 1 ${r} 0 A ${r} ${r} 0 1 1 ${-r} 0 Z`;
+      }
+      const b = r * Math.abs(2 * frac - 1); // terminator ellipse semi-minor axis
+      // Outer arc: half of the Moon's circle on the lit side.
+      //   Waxing → lit is on the right → outer goes (0,-r) clockwise through (+r,0) to (0,+r) → sweep=1
+      //   Waning → lit is on the left  → sweep=0
+      const outerSweep = waxing ? 1 : 0;
+      // Inner arc (terminator ellipse) from (0,+r) back to (0,-r):
+      //   Crescent (frac<0.5) with lit on right → bulges right → from (0,r) CW to (0,-r) → sweep=1
+      //   Gibbous  (frac>0.5) with lit on right → bulges left  → sweep=0
+      //   Mirrored for waning side.
+      let innerSweep;
+      if ((frac < 0.5 && waxing) || (frac > 0.5 && !waxing)) innerSweep = 1;
+      else innerSweep = 0;
+      return `M 0 ${-r} A ${r} ${r} 0 0 ${outerSweep} 0 ${r} A ${b} ${r} 0 0 ${innerSweep} 0 ${-r} Z`;
+    }
+
+    function drawOrbit() {
+      const e = getEarth();
+      const { a, b, c } = getOrbitParams();
+      const cx = e.x - c;
+
+      // Outer glow halo
+      ctx.strokeStyle = 'rgba(140, 160, 220, 0.05)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(cx, e.y, a, b, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Main orbit line (dashed)
+      ctx.strokeStyle = 'rgba(180, 190, 230, 0.14)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 8]);
+      ctx.beginPath();
+      ctx.ellipse(cx, e.y, a, b, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Perigee & apogee marks
+      const marks = [
+        { x: e.x + (a - c), y: e.y, label: '근지점' },
+        { x: e.x - (a + c), y: e.y, label: '원지점' }
+      ];
+      ctx.font = '400 9px "Space Mono", monospace';
+      ctx.fillStyle = 'rgba(180, 190, 230, 0.35)';
+      for (const mk of marks) {
+        ctx.beginPath();
+        ctx.arc(mk.x, mk.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.textAlign = mk.label === '근지점' ? 'left' : 'right';
+        ctx.fillText(mk.label.toUpperCase() === '근지점' ? 'PERIGEE' : 'APOGEE',
+          mk.x + (mk.label === '근지점' ? 8 : -8), mk.y - 8);
+      }
+    }
+
+    function drawEarth() {
+      const e = getEarth();
+
+      // Outer atmospheric glow
+      const glow = ctx.createRadialGradient(e.x, e.y, e.r * 0.9, e.x, e.y, e.r * 1.7);
+      glow.addColorStop(0, 'rgba(100, 160, 255, 0.22)');
+      glow.addColorStop(0.5, 'rgba(100, 160, 255, 0.08)');
+      glow.addColorStop(1, 'rgba(100, 160, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Earth disk
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Ocean base
+      const ocean = ctx.createRadialGradient(
+        e.x - e.r * 0.35, e.y - e.r * 0.35, e.r * 0.1,
+        e.x, e.y, e.r * 1.1
+      );
+      ocean.addColorStop(0, '#4a8fd9');
+      ocean.addColorStop(0.5, '#1e4d8f');
+      ocean.addColorStop(1, '#0a1a3d');
+      ctx.fillStyle = ocean;
+      ctx.fillRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2);
+
+      // Continents — rotate with earth
+      const continents = [
+        { a: 0.15, r: 0.55, w: 0.40, h: 0.28, rot: 0.3, color: '#3f8a4a' },
+        { a: 1.25, r: 0.62, w: 0.25, h: 0.32, rot: -0.2, color: '#4a9555' },
+        { a: 2.7, r: 0.45, w: 0.32, h: 0.22, rot: 0.6, color: '#3f8a4a' },
+        { a: -1.0, r: 0.58, w: 0.28, h: 0.25, rot: 0.1, color: '#449149' },
+        { a: -2.1, r: 0.50, w: 0.22, h: 0.20, rot: -0.4, color: '#3f8a4a' },
+        { a: -0.4, r: 0.30, w: 0.18, h: 0.16, rot: 0.2, color: '#4a9555' },
+        { a: 2.0, r: 0.25, w: 0.14, h: 0.12, rot: 0, color: '#449149' }
+      ];
+      for (const c of continents) {
+        const ang = c.a + earthRotation;
+        const cx = e.x + Math.cos(ang) * c.r * e.r;
+        const cy = e.y + Math.sin(ang) * c.r * e.r;
+        ctx.fillStyle = c.color;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, c.w * e.r, c.h * e.r, ang + c.rot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Cloud wisps (slight parallax — half-speed)
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#ffffff';
+      const clouds = [
+        { a: 0.6, r: 0.7, w: 0.35, h: 0.08 },
+        { a: -0.9, r: 0.65, w: 0.30, h: 0.07 },
+        { a: 2.2, r: 0.55, w: 0.25, h: 0.06 },
+        { a: -2.5, r: 0.4, w: 0.22, h: 0.05 }
+      ];
+      for (const cl of clouds) {
+        const ang = cl.a + earthRotation * 0.6;
+        const cx = e.x + Math.cos(ang) * cl.r * e.r;
+        const cy = e.y + Math.sin(ang) * cl.r * e.r;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, cl.w * e.r, cl.h * e.r, ang, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // Day/night shading (light from the right-ish)
+      const shade = ctx.createRadialGradient(
+        e.x - e.r * 0.4, e.y - e.r * 0.35, e.r * 0.2,
+        e.x + e.r * 0.2, e.y + e.r * 0.2, e.r * 1.3
+      );
+      shade.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      shade.addColorStop(0.6, 'rgba(0, 0, 0, 0.15)');
+      shade.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+      ctx.fillStyle = shade;
+      ctx.fillRect(e.x - e.r, e.y - e.r, e.r * 2, e.r * 2);
+
+      ctx.restore();
+
+      // Atmosphere rim
+      ctx.strokeStyle = 'rgba(150, 210, 255, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r + 1, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Outer thin ring when dragging
+      if (isDragging) {
+        ctx.strokeStyle = 'rgba(255, 207, 122, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r + 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function drawLineOfSight(visible) {
+      const o = getObserver();
+      const m = getMoon();
+
+      if (visible) {
+        // Bright golden line of sight
+        const grad = ctx.createLinearGradient(o.x, o.y, m.x, m.y);
+        grad.addColorStop(0, 'rgba(255, 207, 122, 0.7)');
+        grad.addColorStop(1, 'rgba(255, 207, 122, 0.2)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(o.x, o.y);
+        ctx.lineTo(m.x, m.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        // Dimmed, indicating moon is below horizon
+        ctx.strokeStyle = 'rgba(107, 117, 168, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 6]);
+        ctx.beginPath();
+        ctx.moveTo(o.x, o.y);
+        ctx.lineTo(m.x, m.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function drawObserver(visible) {
+      const o = getObserver();
+      const e = getEarth();
+
+      // Horizon line (tangent to Earth at observer)
+      const tx = -o.ny;
+      const ty = o.nx;
+      const hLen = e.r * 0.9;
+      ctx.strokeStyle = 'rgba(255, 207, 122, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(o.x - tx * hLen, o.y - ty * hLen);
+      ctx.lineTo(o.x + tx * hLen, o.y + ty * hLen);
+      ctx.stroke();
+
+      // Observer dot — outer glow
+      const glow = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, 14);
+      glow.addColorStop(0, 'rgba(255, 207, 122, 0.6)');
+      glow.addColorStop(1, 'rgba(255, 207, 122, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Observer dot — core
+      ctx.fillStyle = '#ffcf7a';
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, 4, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Label
+      const labelDist = 26;
+      const lx = o.x + o.nx * labelDist;
+      const ly = o.y + o.ny * labelDist;
+      ctx.font = '500 11px "IBM Plex Sans KR"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255, 207, 122, 0.95)';
+      ctx.fillText('관찰자', lx, ly);
+    }
+
+    function drawMoon() {
+      const m = getMoon();
+
+      // Soft glow around the moon
+      const glow = ctx.createRadialGradient(m.x, m.y, m.r * 0.8, m.x, m.y, m.r * 2.5);
+      glow.addColorStop(0, 'rgba(245, 228, 180, 0.28)');
+      glow.addColorStop(1, 'rgba(245, 228, 180, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Dark base (shadow side)
+      ctx.fillStyle = '#2d2a22';
+      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+
+      // Sun-lit side (right) — linear gradient left (dark) → right (bright)
+      const lit = ctx.createLinearGradient(m.x - m.r, m.y, m.x + m.r, m.y);
+      lit.addColorStop(0, 'rgba(253, 246, 227, 0)');
+      lit.addColorStop(0.42, 'rgba(253, 246, 227, 0)');
+      lit.addColorStop(0.55, 'rgba(220, 207, 174, 0.55)');
+      lit.addColorStop(0.75, 'rgba(245, 228, 180, 0.95)');
+      lit.addColorStop(1, 'rgba(253, 246, 227, 1)');
+      ctx.fillStyle = lit;
+      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+
+      // Subtle spherical shading (upper-right hotspot)
+      const sphere = ctx.createRadialGradient(
+        m.x + m.r * 0.3, m.y - m.r * 0.25, m.r * 0.1,
+        m.x, m.y, m.r
+      );
+      sphere.addColorStop(0, 'rgba(255, 250, 230, 0.15)');
+      sphere.addColorStop(1, 'rgba(255, 250, 230, 0)');
+      ctx.fillStyle = sphere;
+      ctx.fillRect(m.x - m.r, m.y - m.r, m.r * 2, m.r * 2);
+
+      // A few faint craters (visible only on lit side since dark side is uniformly dark)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      const craters = [
+        { a: 0.1, r: 0.45, s: 0.16 },
+        { a: 1.2, r: 0.50, s: 0.09 },
+        { a: -0.6, r: 0.35, s: 0.19 },
+        { a: 2.4, r: 0.30, s: 0.11 }
+      ];
+      for (const c of craters) {
+        const cx = m.x + Math.cos(c.a) * c.r * m.r;
+        const cy = m.y + Math.sin(c.a) * c.r * m.r;
+        // Only draw if on the lit half (x > moon center)
+        if (cx > m.x - m.r * 0.1) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, c.s * m.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+
+      // Rim highlight on the sunward side
+      ctx.strokeStyle = 'rgba(255, 240, 200, 0.35)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.r, -Math.PI / 2.2, Math.PI / 2.2);
+      ctx.stroke();
+    }
+
+    // --- Info panel updates ---
+    const observerMoonEl = document.getElementById('observerMoon');
+    const moonLitPathEl = document.getElementById('moonLitPath');
+    const phaseIconPathEl = document.getElementById('phaseIconPath');
+    const phaseNameValEl = document.getElementById('phaseNameVal');
+    const phaseEnValEl = document.getElementById('phaseEnVal');
+    const distValEl = document.getElementById('distVal');
+    const angleValEl = document.getElementById('angleVal');
+    const phaseValEl = document.getElementById('phaseVal');
+    const relSizeValEl = document.getElementById('relSizeVal');
+    const sizeBarEl = document.getElementById('sizeBar');
+    const visBadgeEl = document.getElementById('visBadge');
+    const dayNumEl = document.getElementById('dayNum');
+    const dayLabelKoEl = document.getElementById('dayLabelKo');
+
+    function updatePanel(visible) {
+      const o = getObserver();
+      const m = getMoon();
+      const dx = m.x - o.x;
+      const dy = m.y - o.y;
+      const distPx = Math.sqrt(dx * dx + dy * dy);
+      const { a } = getOrbitParams();
+
+      // Reference: moon's average orbit = 384,400 km, mapped to semi-major axis
+      const distKm = (distPx / a) * 384400;
+      distValEl.textContent = (distKm / 1000).toFixed(1);
+
+      const moonRadiusKm = 1737;
+      const angularDeg = 2 * Math.atan(moonRadiusKm / distKm) * (180 / Math.PI);
+      angleValEl.textContent = angularDeg.toFixed(3);
+
+      // Orbital position label
+      const orbA = ((moonOrbit % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      let orbitLabel;
+      if (orbA < 0.35 || orbA > Math.PI * 2 - 0.35) orbitLabel = '근지점 PERIGEE';
+      else if (Math.abs(orbA - Math.PI) < 0.35) orbitLabel = '원지점 APOGEE';
+      else if (orbA < Math.PI) orbitLabel = '공전 중 →';
+      else orbitLabel = '← 공전 중';
+      phaseValEl.textContent = orbitLabel;
+
+      // Relative size (0–100%)
+      const { e: ecc } = getOrbitParams();
+      const maxDist = a * (1 + ecc) + Math.min(W, H) * CFG.earthRRatio; // apogee + earth radius
+      const minDist = a * (1 - ecc) - Math.min(W, H) * CFG.earthRRatio; // perigee - earth radius
+      const norm = 1 - (distPx - minDist) / (maxDist - minDist);
+      const clamped = Math.max(0, Math.min(1, norm));
+      relSizeValEl.textContent = Math.round(clamped * 100) + '%';
+      sizeBarEl.style.width = (clamped * 100) + '%';
+
+      // Observer panel moon size (visual)
+      const viewSize = 252;
+      const sz = viewSize * (0.18 + clamped * 0.55);
+      observerMoonEl.style.width = sz + 'px';
+      observerMoonEl.style.height = sz + 'px';
+      observerMoonEl.classList.toggle('below-horizon', !visible);
+
+      // Moon phase — lit area SVG path
+      const phase = getMoonPhase();
+      const litPath = moonPhasePath(50, phase.frac, phase.waxing);
+      moonLitPathEl.setAttribute('d', litPath);
+      phaseIconPathEl.setAttribute('d', litPath);
+      phaseNameValEl.textContent = phase.ko;
+      phaseEnValEl.textContent = phase.en;
+
+      visBadgeEl.textContent = visible ? 'VISIBLE' : 'BELOW HORIZON';
+      visBadgeEl.classList.toggle('visible', visible);
+      visBadgeEl.classList.toggle('hidden', !visible);
+    }
+
+    function isMoonVisible() {
+      const o = getObserver();
+      const m = getMoon();
+      const toMx = m.x - o.x;
+      const toMy = m.y - o.y;
+      const mag = Math.sqrt(toMx * toMx + toMy * toMy) || 1;
+      const dot = o.nx * (toMx / mag) + o.ny * (toMy / mag);
+      return dot > -0.05;
+    }
+
+    // --- Main loop ---
+    let lastTime = performance.now();
+    function loop(time) {
+      const dt = Math.min(0.05, (time - lastTime) / 1000);
+      lastTime = time;
+
+      // Advance simulation time
+      moonOrbit += dt * MOON_ANG_SPEED;
+      if (moonOrbit > Math.PI * 2) moonOrbit -= Math.PI * 2;
+      days += dt * EARTH_ANG_SPEED / (Math.PI * 2);
+
+      // Earth: user drag inertia + auto-rotation (paused while dragging)
+      if (!isDragging) {
+        earthRotation += earthAngularVel;
+        earthAngularVel *= 0.96;
+        if (Math.abs(earthAngularVel) < 0.0002) earthAngularVel = 0;
+        earthRotation += EARTH_ANG_SPEED * dt;
+      }
+
+      ctx.clearRect(0, 0, W, H);
+
+      drawStars(time * 0.001);
+      drawSun();
+      drawOrbit();
+
+      const visible = isMoonVisible();
+
+      drawLineOfSight(visible);
+      drawEarth();
+      drawObserver(visible);
+      drawMoon();
+
+      updatePanel(visible);
+
+      // Day counter
+      const dayInt = Math.floor(days);
+      dayNumEl.textContent = dayInt;
+      dayLabelKoEl.textContent = dayInt;
+
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>
